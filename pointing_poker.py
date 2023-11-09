@@ -5,7 +5,7 @@ import pandas as pd
 conn_sqlite = sqlite3.connect('test.sqlite')
 cur_sqlite = conn_sqlite.cursor()
 
-cur_sqlite.execute('create table if not exists test (1 int, b int)')
+cur_sqlite.execute('create table if not exists test (a int, b int)')
 conn_sqlite.commit()
 
 tt = pd.read_sql_query('select a from test', conn_sqlite)['a'].to_list()
