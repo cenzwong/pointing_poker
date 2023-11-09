@@ -10,7 +10,7 @@ conn_sqlite.commit()
 
 tt = pd.read_sql_query('select a from test', conn_sqlite)['a'].to_list()
 
-if len(tt) = 0 :
+if len(tt) == 0 :
   cur_sqlite.execute("""insert into test values ('1', '1')""")
 
 
