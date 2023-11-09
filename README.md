@@ -1,1 +1,1 @@
-# pointing_poker
+# Primitive implementation of pointing poker for SCRUM planning
