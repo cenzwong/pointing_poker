@@ -158,7 +158,7 @@ if st.session_state['user_name'] == '' or st.session_state['team_name'] == '' :
         submitted = st.form_submit_button("Submit")
         if submitted:
             st.session_state['user_name'] = user_name
-            st.session_state['team_name'] = team_name
+            st.session_state['team_name'] = regex.sub('', team_name).lower()
             insert_user(st.session_state['team_name'], st.session_state['user_name'])
    
 
