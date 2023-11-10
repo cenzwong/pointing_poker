@@ -49,11 +49,15 @@ hide_hamburger()
 db = 'pointing_poker.sqlite'
 voting_events_table = 'voting_events'
 voting_statuses_table = 'voting_statuses'
+users_table = 'users'
+users_columns = ['name', 'timestamp']
+users_datatypes = ['text', 'text']
 voting_events_columns = ['voting_id', 'name', 'vote', 'timestamp']
 voting_events_datatypes = ['text', 'text', 'text', 'text']
 voting_statuses_columns = ['voting_id', 'voting_status', 'timestamp']
 voting_statuses_datatypes = ['text', 'int', 'text']
 allowed_votes = ['?', '☕', '0', '0.5', '1', '2', '3', '5', '8', '13', '21']
+user_retention_time = '-2 hours' 
 
 
 ##################### INIT SESSION STATE ###########################
@@ -70,50 +74,18 @@ if 'voting_id' not in st.session_state :
     st.session_state['voting_id'] = ''
 
     
-
-if st.session_state['user_name'] == '' or st.session_state['team_name'] == '' :
-    with st.form("Login as: ") :
-        user_name  = st.text_input('Login name: ', '' )
-        team_name = st.text_input('Team: ', '')
-        submitted = st.form_submit_button("Submit")
-        if submitted:
-            st.session_state['user_name'] = user_name
-            st.session_state['team_name'] = team_name
-    
-if st.session_state['host_user'] == False :
-    hostlogin = st.button("Login as host", type="primary", key="host_login")
-
-    if hostlogin :
-        st.session_state['host_user'] = True
-        st.write('You are the host')
-else :
-    st.write('You are the host')       
-        
 @st.cache_resource
 def sqlite_connection() :
     conn_sqlite = sqlite3.connect(db, check_same_thread=False)
     cur_sqlite = conn_sqlite.cursor()
     return[conn_sqlite, cur_sqlite]
 
-conn_sqlite, cur_sqlite = sqlite_connection()    
-
-def get_voting_id() :
-    try :
-        voting_id = pd.read_sql_query(f"""select max(voting_id) as voting_id from {st.session_state['team_name']}__{voting_statuses_table}_last
-                                  where timestamp = (select max(timestamp) from {st.session_state['team_name']}__{voting_statuses_table}_last
-                                  where voting_status > -1)""", conn_sqlite )['voting_id'].to_list()[0]
-        st.session_state['voting_id'] = voting_id
-    except :
-        st.write("Waiting for host to start the voting")
-
-if st.session_state['team_name'] != '' and st.session_state['user_name'] != '' :
-    get_voting_id()
-
-st.write("Logged in as: ", st.session_state['user_name'])
+conn_sqlite, cur_sqlite = sqlite_connection()
 
 def reset_database() :
     voting_events_ddl_cols = ','.join([f'{col} {dtype}' for col, dtype in zip(voting_events_columns, voting_events_datatypes)])
     voting_statuses_ddl_cols = ','.join([f'{col} {dtype}' for col, dtype in zip(voting_statuses_columns, voting_statuses_datatypes)])
+    users_ddl_cols = ','.join([f'{col} {dtype}' for col, dtype in zip(users_columns, users_datatypes)])
     
     cur_sqlite.execute(f"drop table if exists {st.session_state['team_name']}__{voting_events_table}")
     conn_sqlite.commit()
@@ -145,24 +117,109 @@ def reset_database() :
                        select * from cte where RN = 1""")
     conn_sqlite.commit()
     
+    cur_sqlite.execute(f"drop table if exists {st.session_state['team_name']}__{users_table}")
+    conn_sqlite.commit()
+    cur_sqlite.execute(f"create table {st.session_state['team_name']}__{users_table} ({users_ddl_cols})")
+    conn_sqlite.commit()
+    
+def insert_user(team_name, user_name) :
+    try :
+        cur_sqlite.execute(f"""insert into {team_name}__{users_table}
+                           ({', '.join(users_columns)} )
+                           VALUES ('{user_name}' , datetime('now') ) """)
+        conn_sqlite.commit()
+    except :
+        reset_database()
+        cur_sqlite.execute(f"""insert into {team_name}__{users_table}
+                           ({', '.join(users_columns)} )
+                           VALUES ('{user_name}' , datetime('now') ) """)
+        conn_sqlite.commit()
+
+    
+
+
+if st.session_state['user_name'] == '' or st.session_state['team_name'] == '' :
+    with st.form("Login as: ") :
+        user_name  = st.text_input('Login name: ', '' )
+        team_name = st.text_input('Team: ', '').lower()
+        submitted = st.form_submit_button("Submit")
+        if submitted:
+            st.session_state['user_name'] = user_name
+            st.session_state['team_name'] = team_name
+            insert_user(st.session_state['team_name'], st.session_state['user_name'])
+            
+    
+if st.session_state['host_user'] == False :
+    hostlogin = st.button("Login as host", type="primary", key="host_login")
+
+    if hostlogin :
+        st.session_state['host_user'] = True
+        st.write('You are the host')
+else :
+    st.write('You are the host')       
+        
+ 
+
+def get_voting_id() :
+    try :
+        voting_id = pd.read_sql_query(f"""select max(voting_id) as voting_id from {st.session_state['team_name']}__{voting_statuses_table}_last
+                                  where timestamp = (select max(timestamp) from {st.session_state['team_name']}__{voting_statuses_table}_last
+                                  where voting_status > -1)""", conn_sqlite )['voting_id'].to_list()[0]
+        st.session_state['voting_id'] = voting_id or ''
+        if not voting_id :
+            st.write("Waiting for host to start the voting")
+    except :
+        st.write("Waiting for host to start the voting")
+
+if st.session_state['team_name'] != '' and st.session_state['user_name'] != '' :
+    get_voting_id()
+
+st.write("Logged in as: ", st.session_state['user_name'])
+
 
 def show_results(voting_id) :
-    df = pd.read_sql_query(f"""SELECT
+    df = pd.read_sql_query(f"""with unioned as (SELECT
 	                          e.name,
-	                          case when s.voting_status = 1 and e.name <> '{st.session_state['user_name']}' then "⌛" else e.vote  end as vote
+	                          case 
+                                  when s.voting_status = 1 and e.vote = "⌛" then e.vote
+                                  when s.voting_status = 1 and e.name <> '{st.session_state['user_name']}' then "❓"
+                                  else e.vote
+                              end as vote,
+                              e.timestamp
                           from {st.session_state['team_name']}__{voting_events_table}_last e
                           inner join {st.session_state['team_name']}__{voting_statuses_table}_last s
                           on s.voting_id = e.voting_id
-                          where e.voting_id = '{voting_id}' """, conn_sqlite)
+                          where e.voting_id = '{voting_id}'
+                          
+                          UNION ALL
+                          
+                          select name, "⌛" as vote, timestamp
+					      from {st.session_state['team_name']}__{users_table}
+                          where timestamp > datetime('now', '{user_retention_time}')
+                          ),
+                          ranked as (select name, vote, row_number() over (partition by name order by timestamp desc) as RN from unioned)
+                          
+                          select name, vote from ranked where RN = 1
+                          
+                          """, conn_sqlite)
     return df
     
     
 def is_revealed(voting_id) :
-    rev = pd.read_sql_query(f"""select voting_status from {st.session_state['team_name']}__{voting_statuses_table}_last where voting_id = '{voting_id}' """, conn_sqlite)['voting_status'].to_list()[0]
+    rev = pd.read_sql_query(f"""select voting_status from {st.session_state['team_name']}__{voting_statuses_table}_last where voting_id = '{voting_id}' """, conn_sqlite)['voting_status'].to_list()
+    if len(rev) > 0 :
+        rev = rev[0]
+    else :
+        return False
     if rev == 1 :
         return False
     else :
         return True
+
+def voted(voting_id, user_name) :
+    if len(pd.read_sql_query(f"""select name from {st.session_state['team_name']}__{voting_events_table} where voting_id = '{voting_id}' """, conn_sqlite)['name'].to_list()) > 0 :
+        return True
+    return False
 
 #####################  ADMIN PANEL ############################
 if (st.session_state['host_user'] == True) and (len(st.session_state['user_name']) > 1) and (len(st.session_state['team_name']) > 1):
@@ -205,10 +262,18 @@ if (st.session_state['host_user'] == True) and (len(st.session_state['user_name'
                                ({', '.join(voting_statuses_columns)} )
                                VALUES ('{st.session_state['voting_id']}', '1', datetime('now') )""")
             conn_sqlite.commit()
+
+
             
 
 if st.session_state['voting_id'] != '' :
     with st.form("Place your vote!") :
+        if voted(st.session_state['voting_id'], st.session_state['user_name']) == False :
+            cur_sqlite.execute(f"""insert into {st.session_state['team_name']}__{voting_events_table}
+            ({', '.join(voting_events_columns)})
+            VALUES ('{st.session_state['voting_id']}', '{st.session_state['user_name']}', '⌛', datetime('now'))""")
+            conn_sqlite.commit()
+        
         vote = st.radio('Your vote: ', allowed_votes, horizontal = True)
         
         submitted = st.form_submit_button("Submit")
@@ -233,3 +298,7 @@ if st.session_state['voting_id'] != '' :
             st.toast(f"""Average points: {average_vote}""")
             
         time.sleep(2)
+        
+
+
+
