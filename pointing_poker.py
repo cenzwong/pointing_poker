@@ -147,16 +147,22 @@ def reset_database() :
     
 
 def show_results(voting_id) :
-    st.dataframe(pd.read_sql_query(f"""SELECT
+    df = pd.read_sql_query(f"""SELECT
 	                          e.name,
-	                          case when s.voting_status <> 1 then e.vote else "⌛" end as vote
+	                          case when s.voting_status = 1 and e.name <> '{st.session_state['user_name']}' then "⌛" else e.vote  end as vote
                           from {st.session_state['team_name']}__{voting_events_table}_last e
                           inner join {st.session_state['team_name']}__{voting_statuses_table}_last s
                           on s.voting_id = e.voting_id
-                          where e.voting_id = '{voting_id}' """, conn_sqlite), hide_index=True )
+                          where e.voting_id = '{voting_id}' """, conn_sqlite)
+    return df
     
     
-    
+def is_revealed(voting_id) :
+    rev = pd.read_sql_query(f"""select voting_status from {st.session_state['team_name']}__{voting_statuses_table}_last where voting_id = '{voting_id}' """, conn_sqlite)['voting_status'].to_list()[0]
+    if rev == 1 :
+        return False
+    else :
+        return True
 
 #####################  ADMIN PANEL ############################
 if (st.session_state['host_user'] == True) and (len(st.session_state['user_name']) > 1) and (len(st.session_state['team_name']) > 1):
@@ -183,7 +189,7 @@ if (st.session_state['host_user'] == True) and (len(st.session_state['user_name'
                                ({', '.join(voting_statuses_columns)} )
                                VALUES ('{st.session_state['voting_id']}', '0', datetime('now') )""")
             conn_sqlite.commit()
-            
+                    
     
     next_voting = st.button("Start/Next voting", key="next_voting")
     if next_voting :
@@ -212,9 +218,18 @@ if st.session_state['voting_id'] != '' :
             ({', '.join(voting_events_columns)})
             VALUES ('{st.session_state['voting_id']}', '{st.session_state['user_name']}', '{vote}', datetime('now'))""")
             conn_sqlite.commit()
-    col1, col2 = st.columns(2)
-    with col1.empty() :
-        while True :
-            get_voting_id()
-            show_results(st.session_state['voting_id'])
-            time.sleep(2)
+    
+    placeholder = st.empty()    
+    
+    while True :
+        get_voting_id()
+        df_res = show_results(st.session_state['voting_id'])
+        placeholder.dataframe(df_res, hide_index=True )
+    
+        if is_revealed(st.session_state['voting_id']) :
+            df_to_avg = df_res
+            df_to_avg['vote'] = pd.to_numeric(df_to_avg['vote'], errors="coerce")
+            average_vote = round(df_to_avg['vote'].mean(), 1)
+            st.toast(f"""Average points: {average_vote}""")
+            
+        time.sleep(2)
