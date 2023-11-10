@@ -3,6 +3,7 @@ import sqlite3
 import time
 import uuid
 import pandas as pd
+import re
 
 st.set_page_config(layout="wide", page_title='CLP Scrum Pointing Poker', initial_sidebar_state="collapsed")
 
@@ -57,7 +58,9 @@ voting_events_datatypes = ['text', 'text', 'text', 'text']
 voting_statuses_columns = ['voting_id', 'voting_status', 'timestamp']
 voting_statuses_datatypes = ['text', 'int', 'text']
 allowed_votes = ['?', '☕', '0', '0.5', '1', '2', '3', '5', '8', '13', '21']
-user_retention_time = '-2 hours' 
+user_retention_time = '-2 hours'
+regex = re.compile('[^a-zA-Z]')
+
 
 
 ##################### INIT SESSION STATE ###########################
@@ -136,29 +139,29 @@ def insert_user(team_name, user_name) :
         conn_sqlite.commit()
 
     
+query_params = st.experimental_get_query_params()
+if 'host_user' in query_params :
+    if query_params['host_user'] :
+        st.header('You are the host :sunglasses:')
+        st.session_state['host_user'] = True
+        
+if 'team_name' in query_params :
+    if query_params['team_name'] :
+        st.session_state['team_name'] = regex.sub('', str(query_params['team_name'])).lower()
+        
 
 
 if st.session_state['user_name'] == '' or st.session_state['team_name'] == '' :
     with st.form("Login as: ") :
-        user_name  = st.text_input('Login name: ', '' )
-        team_name = st.text_input('Team: ', '').lower()
+        user_name  = st.text_input('Login name: ', '', key="user_name_input" )
+        team_name = st.text_input('Team: ', st.session_state['team_name'])
         submitted = st.form_submit_button("Submit")
         if submitted:
             st.session_state['user_name'] = user_name
             st.session_state['team_name'] = team_name
             insert_user(st.session_state['team_name'], st.session_state['user_name'])
-            
-    
-if st.session_state['host_user'] == False :
-    hostlogin = st.button("Login as host", type="primary", key="host_login")
+   
 
-    if hostlogin :
-        st.session_state['host_user'] = True
-        st.write('You are the host')
-else :
-    st.write('You are the host')       
-        
- 
 
 def get_voting_id() :
     try :
@@ -298,7 +301,3 @@ if st.session_state['voting_id'] != '' :
             st.toast(f"""Average points: {average_vote}""")
             
         time.sleep(2)
-        
-
-
-
