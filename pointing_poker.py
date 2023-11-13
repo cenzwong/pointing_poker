@@ -288,7 +288,7 @@ if st.session_state['voting_id'] != '' :
                 VALUES ('{st.session_state['voting_id']}', '{st.session_state['user_name']}', '{vote}', datetime('now'))""")
                 conn_sqlite.commit()
             else :
-                st.toast("""The voting has ended.""")
+                st.error("""The voting has ended.""")
     
     placeholder = st.empty()    
     
