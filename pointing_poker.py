@@ -281,18 +281,21 @@ if st.session_state['voting_id'] != '' :
         
         submitted = st.form_submit_button("Submit")
         if submitted:
-            st.write("Your vote: ", vote)
-            cur_sqlite.execute(f"""insert into {st.session_state['team_name']}__{voting_events_table}
-            ({', '.join(voting_events_columns)})
-            VALUES ('{st.session_state['voting_id']}', '{st.session_state['user_name']}', '{vote}', datetime('now'))""")
-            conn_sqlite.commit()
+            if is_revealed == False :
+                st.write("Your vote: ", vote)
+                cur_sqlite.execute(f"""insert into {st.session_state['team_name']}__{voting_events_table}
+                ({', '.join(voting_events_columns)})
+                VALUES ('{st.session_state['voting_id']}', '{st.session_state['user_name']}', '{vote}', datetime('now'))""")
+                conn_sqlite.commit()
+            else :
+                st.toast("""The voting has ended.""")
     
     placeholder = st.empty()    
     
     while True :
         get_voting_id()
         df_res = show_results(st.session_state['voting_id'])
-        placeholder.dataframe(df_res, hide_index=True )
+        placeholder.dataframe(df_res, hide_index=True, height=((len(df_res) + 1) * 42) )
     
         if is_revealed(st.session_state['voting_id']) :
             df_to_avg = df_res
