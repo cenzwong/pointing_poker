@@ -10,4 +10,5 @@ Deploy for free to Streamlit community cloud: https://docs.streamlit.io/streamli
 **Participant** login: https://\<app name\>.streamlit.app/?team_name=\<team name\>
 
 Screenshot:  
-![image](https://github.com/laszloszolnoki/pointing_poker/assets/26165255/8484bccf-651c-4d2d-9db8-95b724bc2b88)
+![image](https://github.com/laszloszolnoki/pointing_poker/assets/26165255/a67c76c1-17e6-48bc-a89b-2886b8ddac17)
+
