@@ -295,12 +295,13 @@ if st.session_state['voting_id'] != '' :
     while True :
         get_voting_id()
         df_res = show_results(st.session_state['voting_id'])
-        placeholder.dataframe(df_res, hide_index=True, height=((len(df_res) + 1) * 42) )
-    
         if is_revealed(st.session_state['voting_id']) :
-            df_to_avg = df_res
+            df_to_avg = df_res.copy()
             df_to_avg['vote'] = pd.to_numeric(df_to_avg['vote'], errors="coerce")
             average_vote = round(df_to_avg['vote'].mean(), 1)
-            st.toast(f"""Average points: {average_vote}""")
-            
+            df_avg_append = {'name' : 'Average points:', 'vote' : str(average_vote)}
+            df_res = df_res.append(df_avg_append, ignore_index = True)
+        
+        placeholder.dataframe(df_res, hide_index=True, height=((len(df_res) + 1) * 42) )
+    
         time.sleep(2)
