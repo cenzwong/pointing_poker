@@ -299,8 +299,8 @@ if st.session_state['voting_id'] != '' :
             df_to_avg = df_res.copy()
             df_to_avg['vote'] = pd.to_numeric(df_to_avg['vote'], errors="coerce")
             average_vote = round(df_to_avg['vote'].mean(), 1)
-            df_avg_append = {'name' : 'Average points:', 'vote' : str(average_vote)}
-            df_res = df_res.append(df_avg_append, ignore_index = True)
+            df_avg_append = pd.DataFrame([{'name' : 'Average points:', 'vote' : str(average_vote)}])
+            df_res = pd.concat([df_res, df_avg_append], ignore_index = True)
         
         placeholder.dataframe(df_res, hide_index=True, height=((len(df_res) + 1) * 42) )
     
