@@ -281,7 +281,7 @@ if st.session_state['voting_id'] != '' :
         
         submitted = st.form_submit_button("Submit")
         if submitted:
-            if is_revealed == False :
+            if is_revealed(st.session_state['voting_id']) == False :
                 st.write("Your vote: ", vote)
                 cur_sqlite.execute(f"""insert into {st.session_state['team_name']}__{voting_events_table}
                 ({', '.join(voting_events_columns)})
